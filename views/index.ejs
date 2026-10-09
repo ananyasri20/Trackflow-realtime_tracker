@@ -1,0 +1,136 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>TrackFlow | Fleet Dashboard</title>
+
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <aside class="sidebar">
+        <h2>TrackFlow<span>.</span></h2>
+        <p class="muted">FLEET MANAGEMENT</p>
+
+        <a class="active" href="/">Dashboard</a>
+        <a href="#map-section">Live Tracking</a>
+        <a href="#deliveries">Deliveries</a>
+    </aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div>
+                <h1>Fleet Dashboard</h1>
+                <p class="muted">
+                    Monitor your fleet in real time.
+                </p>
+            </div>
+
+            <span id="connection" class="live">
+                Connecting...
+            </span>
+        </header>
+
+        <section class="stats">
+            <article class="stat-card">
+                <p>Total Deliveries</p>
+                <h2 id="total">0</h2>
+            </article>
+
+            <article class="stat-card">
+                <p>Active Drivers</p>
+                <h2 id="active">0</h2>
+            </article>
+
+            <article class="stat-card">
+                <p>Pending Orders</p>
+                <h2 id="pending">0</h2>
+            </article>
+
+            <article class="stat-card">
+                <p>Completed</p>
+                <h2 id="completed">0</h2>
+            </article>
+        </section>
+
+        <section class="panel" id="map-section">
+            <div class="panel-heading">
+                <div>
+                    <h2>Live Driver Tracking</h2>
+                    <p class="muted">
+                        Driver positions update automatically.
+                    </p>
+                </div>
+            </div>
+
+            <div id="map"></div>
+            <div id="drivers" class="driver-list"></div>
+        </section>
+
+        <section class="panel" id="deliveries">
+            <div class="panel-heading">
+                <div>
+                    <h2>Create Delivery</h2>
+                    <p class="muted">
+                        Add a new delivery to your fleet.
+                    </p>
+                </div>
+            </div>
+
+            <form id="delivery-form" class="delivery-form">
+                <input
+                    type="text"
+                    name="customer"
+                    placeholder="Customer name"
+                    required
+                >
+
+                <input
+                    type="text"
+                    name="pickup"
+                    placeholder="Pickup address"
+                    required
+                >
+
+                <input
+                    type="text"
+                    name="destination"
+                    placeholder="Destination"
+                    required
+                >
+
+                <button type="submit">Create Delivery</button>
+            </form>
+
+            <p id="form-message" role="status"></p>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tracking ID</th>
+                            <th>Customer</th>
+                            <th>Destination</th>
+                            <th>Driver</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="delivery-rows"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/script.js" defer></script>
+</body>
+</html>
