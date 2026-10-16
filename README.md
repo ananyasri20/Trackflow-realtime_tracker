@@ -84,7 +84,7 @@ Start the server:
 node app.js
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser and allow location access when prompted.
+Open https://trackflow-realtime-tracker.onrender.com/ in your browser and allow location access when prompted.
 
 ## Testing Live Tracking
 
