@@ -1,11 +1,13 @@
 
 console.log("TrackFlow app is starting...");
-
+require("dotenv").config();
 const express = require("express");
 const path = require("path");
 const http = require("http");
 const { randomUUID } = require("crypto");
 const { Server } = require("socket.io");
+const connectDB = require("./config/db");
+const Delivery = require("./models/Delivery");
 
 const app = express();
 const server = http.createServer(app);
@@ -37,107 +39,167 @@ app.get("/", (req, res) => {
 });
 
 // Dashboard API
-app.get("/api/dashboard", (req, res) => {
-    const allDeliveries = [...deliveries.values()];
+
+app.get("/api/dashboard", async (req, res) => {
+  try {
+    const allDeliveries = await Delivery.find()
+      .sort({ createdAt: -1 })
+      .lean();
+
     const allDrivers = [...drivers.values()];
 
     res.json({
-        drivers: allDrivers,
-        deliveries: allDeliveries,
-        stats: {
-            total: allDeliveries.length,
-            activeDrivers: allDrivers.length,
-            pending: allDeliveries.filter(
-                d => d.status === "Pending"
-            ).length,
-            completed: allDeliveries.filter(
-                d => d.status === "Delivered"
-            ).length
-        }
+      drivers: allDrivers,
+      deliveries: allDeliveries.map(d => ({
+        ...d,
+        id: d._id.toString()
+      })),
+      stats: {
+        total: allDeliveries.length,
+        activeDrivers: allDrivers.length,
+        pending: allDeliveries.filter(
+          d => d.status === "Pending"
+        ).length,
+        completed: allDeliveries.filter(
+          d => d.status === "Delivered"
+        ).length
+      }
     });
+  } catch (error) {
+    console.error("Dashboard error:", error);
+    res.status(500).json({
+      error: "Failed to load dashboard."
+    });
+  }
 });
 
+
 // Create delivery
-app.post("/api/deliveries", (req, res) => {
+
+app.post("/api/deliveries", async (req, res) => {
+  try {
     const { customer, pickup, destination } = req.body;
 
     if (
-        ![customer, pickup, destination].every(
-            value => typeof value === "string" && value.trim()
-        )
+      ![customer, pickup, destination].every(
+        value =>
+          typeof value === "string" && value.trim()
+      )
     ) {
-        return res.status(400).json({
-            error: "Customer, pickup and destination are required."
-        });
+      return res.status(400).json({
+        error: "Customer, pickup and destination are required."
+      });
     }
 
-    const delivery = {
-        id: randomUUID(),
-        trackingId: randomUUID().slice(0, 8).toUpperCase(),
-        customer: customer.trim(),
-        pickup: pickup.trim(),
-        destination: destination.trim(),
-        driverId: null,
-        status: "Pending",
-        createdAt: new Date().toISOString()
+    const delivery = await Delivery.create({
+      trackingId: randomUUID()
+        .slice(0, 8)
+        .toUpperCase(),
+      customer: customer.trim(),
+      pickup: pickup.trim(),
+      destination: destination.trim(),
+      driverId: null,
+      status: "Pending"
+    });
+
+    const result = {
+      ...delivery.toObject(),
+      id: delivery._id.toString()
     };
 
-    deliveries.set(delivery.id, delivery);
-
-    io.emit("delivery-updated", delivery);
-    res.status(201).json(delivery);
+    io.emit("delivery-updated", result);
+    res.status(201).json(result);
+  } catch (error) {
+    console.error("Create delivery error:", error);
+    res.status(500).json({
+      error: "Failed to save delivery."
+    });
+  }
 });
+
 
 // Assign delivery to a driver
-app.patch("/api/deliveries/:id/assign", (req, res) => {
-    const delivery = deliveries.get(req.params.id);
+
+app.patch("/api/deliveries/:id/assign", async (req, res) => {
+  try {
     const { driverId } = req.body;
 
-    if (!delivery) {
-        return res.status(404).json({
-            error: "Delivery not found."
-        });
-    }
-
     if (!drivers.has(driverId)) {
-        return res.status(404).json({
-            error: "Driver not found."
-        });
+      return res.status(404).json({
+        error: "Driver not found."
+      });
     }
 
-    delivery.driverId = driverId;
-    delivery.status = "Assigned";
+    const delivery = await Delivery.findByIdAndUpdate(
+      req.params.id,
+      {
+        driverId,
+        status: "Assigned"
+      },
+      { new: true, runValidators: true }
+    );
 
-    deliveries.set(delivery.id, delivery);
-    io.emit("delivery-updated", delivery);
+    if (!delivery) {
+      return res.status(404).json({
+        error: "Delivery not found."
+      });
+    }
 
-    res.json(delivery);
+    const result = {
+      ...delivery.toObject(),
+      id: delivery._id.toString()
+    };
+
+    io.emit("delivery-updated", result);
+    res.json(result);
+  } catch (error) {
+    console.error("Assign driver error:", error);
+    res.status(500).json({
+      error: "Failed to assign driver."
+    });
+  }
 });
+
 
 // Update delivery status
-app.patch("/api/deliveries/:id/status", (req, res) => {
-    const delivery = deliveries.get(req.params.id);
+
+app.patch("/api/deliveries/:id/status", async (req, res) => {
+  try {
     const { status } = req.body;
 
-    if (!delivery) {
-        return res.status(404).json({
-            error: "Delivery not found."
-        });
-    }
-
     if (!deliveryStatuses.includes(status)) {
-        return res.status(400).json({
-            error: "Invalid delivery status."
-        });
+      return res.status(400).json({
+        error: "Invalid delivery status."
+      });
     }
 
-    delivery.status = status;
+    const delivery = await Delivery.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true, runValidators: true }
+    );
 
-    deliveries.set(delivery.id, delivery);
-    io.emit("delivery-updated", delivery);
+    if (!delivery) {
+      return res.status(404).json({
+        error: "Delivery not found."
+      });
+    }
 
-    res.json(delivery);
+    const result = {
+      ...delivery.toObject(),
+      id: delivery._id.toString()
+    };
+
+    io.emit("delivery-updated", result);
+    res.json(result);
+  } catch (error) {
+    console.error("Update status error:", error);
+    res.status(500).json({
+      error: "Failed to update delivery status."
+    });
+  }
 });
+
 
 // Socket.IO
 io.on("connection", socket => {
@@ -196,6 +258,19 @@ io.on("connection", socket => {
 });
 
 // Start server
-server.listen(PORT, () => {
-    console.log(`TrackFlow running on port ${PORT}`);
-});
+
+ // Start server only after MongoDB connects
+async function startServer() {
+    try {
+        await connectDB();
+
+        server.listen(PORT, () => {
+            console.log(`TrackFlow running on port ${PORT}`);
+        });
+    } catch (error) {
+        console.error("TrackFlow startup failed:", error.message);
+        process.exit(1);
+    }
+}
+
+startServer();
